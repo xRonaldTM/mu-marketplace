@@ -80,7 +80,7 @@
     const BUCKET = 'items'; // nombre del bucket que creaste (debe coincidir)
     // =====================================================
 
-    const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // helper: mostrar preview flotante
     const previewBox = document.getElementById('previewBox');
@@ -189,3 +189,4 @@
   </script>
 </body>
 </html>
+
