@@ -20,14 +20,13 @@
 <body>
   <h1>MU Marketplace (Multiusuario) 🚀</h1>
 
-  <div class="card" id="authCard">
-    <h3>Autenticación</h3>
-    <button id="loginBtn">Iniciar sesión (GitHub/Correo)</button>
-    <button id="logoutBtn" style="display:none;">Cerrar sesión</button>
-    <p class="small" id="userInfo"></p>
+  <div class="card">
+    <button id="loginBtn">Iniciar sesión con Google</button>
+    <button id="logoutBtn" style="display:none">Cerrar sesión</button>
+    <p class="small">Solo los usuarios logueados pueden publicar o modificar sus items.</p>
   </div>
 
-  <div class="card" id="uploadCard" style="display:none;">
+  <div class="card" id="publishCard" style="display:none">
     <h3>Publicar ítem</h3>
     <form id="uploadForm">
       <input name="name" id="name" placeholder="Nombre del ítem (ej: Wings of Satan)" required />
@@ -41,7 +40,7 @@
       <input type="number" name="price" id="price" placeholder="Precio (ej: 100)" required />
       <input type="file" id="file" accept="image/*" required />
       <button type="submit">Publicar ítem</button>
-      <p class="small">Nota: imagenes se suben al bucket 'items' en Supabase.</p>
+      <p class="small">Nota: imágenes se suben al bucket 'items' en Supabase.</p>
     </form>
   </div>
 
@@ -68,7 +67,7 @@
   <div class="card">
     <h3>Resultados</h3>
     <table id="itemsTable">
-      <thead><tr><th>Ítem</th><th>Tipo</th><th>Precio</th><th>Nick</th><th>Discord</th><th>Acción</th></tr></thead>
+      <thead><tr><th>Ítem</th><th>Tipo</th><th>Precio</th><th>Usuario</th><th>Acción</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -79,60 +78,54 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
+    // ====== TUS DATOS DE SUPABASE ======
     const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNjA3NzQsImV4cCI6MjA3MjYzNjc3NH0.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';
     const BUCKET = 'items';
-
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
     let currentUser = null;
 
-    // helpers preview
     const previewBox = document.getElementById('previewBox');
     const previewImg = document.getElementById('previewImg');
-    function showPreview(url){ previewImg.src=url; previewBox.style.display='block'; }
-    function hidePreview(){ previewBox.style.display='none'; }
 
-    // login / logout
+    function showPreview(url){
+      previewImg.src = url;
+      previewBox.style.display = 'block';
+    }
+    function hidePreview(){ previewBox.style.display = 'none'; }
+
+    // ====== LOGIN ======
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
-    const userInfo = document.getElementById('userInfo');
-    const authCard = document.getElementById('authCard');
-    const uploadCard = document.getElementById('uploadCard');
+    const publishCard = document.getElementById('publishCard');
 
-    loginBtn.addEventListener('click', async()=>{
-      const { data } = await supabase.auth.signInWithOAuth({ provider:'github' });
-      // redirige automáticamente a GitHub login
+    loginBtn.addEventListener('click', async () => {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+      if(error) console.log('Error login:', error.message);
     });
 
-    logoutBtn.addEventListener('click', async()=>{
+    logoutBtn.addEventListener('click', async () => {
       await supabase.auth.signOut();
-      currentUser = null;
-      uploadCard.style.display='none';
-      loginBtn.style.display='inline-block';
-      logoutBtn.style.display='none';
-      userInfo.textContent='';
+      alert('Sesión cerrada');
+      publishCard.style.display = 'none';
     });
 
-    supabase.auth.onAuthStateChange((event, session)=>{
+    supabase.auth.onAuthStateChange((event, session) => {
       if(session?.user){
         currentUser = session.user;
-        uploadCard.style.display='block';
-        loginBtn.style.display='none';
-        logoutBtn.style.display='inline-block';
-        userInfo.textContent = `Conectado como: ${currentUser.email || currentUser.user_metadata.full_name || currentUser.id}`;
+        loginBtn.style.display = 'none';
+        logoutBtn.style.display = 'block';
+        publishCard.style.display = 'block';
       } else {
         currentUser = null;
-        uploadCard.style.display='none';
-        loginBtn.style.display='inline-block';
-        logoutBtn.style.display='none';
-        userInfo.textContent='';
+        loginBtn.style.display = 'block';
+        logoutBtn.style.display = 'none';
+        publishCard.style.display = 'none';
       }
-      loadItems();
     });
 
-    // subir item
-    document.getElementById('uploadForm').addEventListener('submit', async(e)=>{
+    // ====== PUBLICAR ITEM ======
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       if(!currentUser){ alert('Debes iniciar sesión'); return; }
 
@@ -144,68 +137,84 @@
 
       const filePath = `${Date.now()}_${file.name.replaceAll(' ','_')}`;
 
-      const { data: uploadData, error: upErr } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl:'3600', upsert:false });
-      if(upErr){ console.error(upErr); alert('Error subiendo imagen: '+upErr.message); return; }
+      try {
+        const { error: upErr } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl:'3600', upsert:false });
+        if(upErr){ console.error(upErr); alert('Error subiendo imagen: '+upErr.message); return; }
 
-      const { error: dbErr } = await supabase.from('items').insert([{
-        name, type, price, image_path:filePath, user_id:currentUser.id
-      }]);
-      if(dbErr){ console.error(dbErr); alert('Error guardando en BD: '+dbErr.message); return; }
+        const { error: dbErr } = await supabase.from('items').insert([{
+          name, type, price, image_path: filePath, status:'activo',
+          user_id: currentUser.id, created_at: new Date().toISOString()
+        }]);
+        if(dbErr){ console.error(dbErr); alert('Error guardando en BD: '+dbErr.message); return; }
 
-      alert('Item publicado ✅');
-      document.getElementById('uploadForm').reset();
-      loadItems();
+        alert('Item publicado ✅');
+        document.getElementById('uploadForm').reset();
+        loadItems();
+      } catch(err){ console.error(err); alert('Error inesperado'); }
     });
 
-    // cargar items
+    // ====== CARGAR ITEMS ======
     async function loadItems(){
-      let query = supabase.from('items').select('*').eq('status','activo');
       const qname = document.getElementById('qname').value.trim();
       const qtype = document.getElementById('qtype').value;
       const qorder = document.getElementById('qorder').value;
-      if(qname) query=query.ilike('name', `%${qname}%`);
-      if(qtype) query=query.eq('type', qtype);
-      query=query.order('price',{ascending:qorder==='asc'});
+
+      let query = supabase.from('items').select('*').eq('status','activo');
+      if(qname) query = query.ilike('name', `%${qname}%`);
+      if(qtype) query = query.eq('type', qtype);
+      query = query.order('created_at', { ascending: false });
+
       const { data, error } = await query;
       if(error){ console.error(error); return; }
 
       const tbody = document.querySelector('#itemsTable tbody');
-      tbody.innerHTML='';
-      for(const item of data||[]){
-        const imgUrl = supabase.storage.from(BUCKET).getPublicUrl(item.image_path).data.publicUrl;
+      tbody.innerHTML = '';
+
+      for(const item of data || []){
+        const pub = supabase.storage.from(BUCKET).getPublicUrl(item.image_path || '');
+        const imgUrl = pub?.data?.publicUrl || '';
+
         const tr = document.createElement('tr');
-        tr.innerHTML=`
+        tr.innerHTML = `
           <td class="item-name" data-img="${imgUrl}" style="cursor:help;color:#7fd1ff">${item.name}</td>
           <td>${item.type}</td>
           <td>${item.price}</td>
-          <td>${item.nick || ''}</td>
-          <td>${item.discord || ''}</td>
-          <td>${currentUser?.id===item.user_id?`<button data-id="${item.id}" class="soldBtn">Marcar vendido</button>`:''}</td>
+          <td>${item.user_id}</td>
+          <td>
+            ${currentUser?.id === item.user_id ? `<button data-id="${item.id}" class="soldBtn">Marcar vendido</button>` : ''}
+          </td>
         `;
+
+        tr.querySelector('.item-name').addEventListener('mouseenter', e => showPreview(e.target.dataset.img));
+        tr.querySelector('.item-name').addEventListener('mouseleave', hidePreview);
+
+        const soldBtn = tr.querySelector('.soldBtn');
+        if(soldBtn){
+          soldBtn.addEventListener('click', async (ev)=>{
+            await supabase.from('items').update({status:'vendido'}).eq('id', item.id);
+            loadItems();
+          });
+        }
+
         tbody.appendChild(tr);
       }
-
-      // listeners hover y soldBtn
-      document.querySelectorAll('.item-name').forEach(td=>{
-        td.addEventListener('mouseenter', (ev)=>showPreview(ev.target.dataset.img));
-        td.addEventListener('mouseleave', hidePreview);
-      });
-      document.querySelectorAll('.soldBtn').forEach(btn=>{
-        btn.addEventListener('click', async(ev)=>{
-          const id=ev.target.dataset.id;
-          await supabase.from('items').update({status:'vendido'}).eq('id',id);
-          loadItems();
-        });
-      });
     }
 
     document.getElementById('btnSearch').addEventListener('click', loadItems);
 
-    // carga inicial
+    // Carga inicial
     loadItems();
+
+    // Realtime
+    try{
+      supabase.channel('public:items')
+        .on('postgres_changes', { event:'*', schema:'public', table:'items' }, payload=> loadItems() )
+        .subscribe();
+    } catch(e){ console.log('Realtime no activo o no disponible', e); }
   </script>
 </body>
 </html>
+
 
 
 
