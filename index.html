@@ -21,17 +21,10 @@
   <h1>MU Marketplace (MVP) 🚀</h1>
 
   <div class="card">
-    <h3>Autenticación</h3>
-    <input id="email" type="email" placeholder="Correo electrónico" />
-    <button id="btnSignIn">Iniciar sesión / Registrarse</button>
-    <p class="small">Se enviará un enlace mágico a tu correo para iniciar sesión.</p>
-  </div>
-
-  <div class="card">
     <h3>Publicar ítem</h3>
     <form id="uploadForm">
       <input name="name" id="name" placeholder="Nombre del ítem" required />
-      <select name="type" id="type" required>
+      <select name="type" id="type">
         <option value="joyas">Joyas</option>
         <option value="items">Items</option>
         <option value="alas">Alas</option>
@@ -39,7 +32,7 @@
         <option value="pendientes">Pendientes</option>
       </select>
       <input type="number" name="price" id="price" placeholder="Precio" required />
-      <input type="date" name="expire_date" id="expire_date" />
+      <input type="date" name="expire_date" id="expire_date" value="" />
       <input name="nick" id="nick" placeholder="Nick del juego" required />
       <input name="discord" id="discord" placeholder="Discord (user#1234)" required />
       <input type="file" id="file" accept="image/*" required />
@@ -82,109 +75,93 @@
 
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+
   <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9uIiwiZXhwIjoxNzUyNjM2Nzc0fQ.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';
-      const BUCKET = 'items';
-      const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  document.addEventListener('DOMContentLoaded', async () => {
+    const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNjA3NzQsImV4cCI6MjA3MjYzNjc3NH0.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';
+    const BUCKET = 'items';
 
-      const previewBox = document.getElementById('previewBox');
-      const previewImg = document.getElementById('previewImg');
-      function showPreview(url){ previewImg.src = url; previewBox.style.display = 'block'; }
-      function hidePreview(){ previewBox.style.display = 'none'; }
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      // ==== LOGIN / REGISTRO ====
-      const btnSignIn = document.getElementById('btnSignIn');
-      btnSignIn.addEventListener('click', async () => {
-        const email = document.getElementById('email').value.trim();
-        if(!email){ alert('Ingresa tu correo'); return; }
-        const { error } = await supabase.auth.signInWithOtp({ email });
-        if(error){ alert('Error al enviar enlace: '+error.message); return; }
-        alert('Revisa tu correo, se ha enviado un enlace para iniciar sesión.');
-      });
+    const previewBox = document.getElementById('previewBox');
+    const previewImg = document.getElementById('previewImg');
 
-      // ==== SUBIR ITEM ====
-      document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const user = supabase.auth.getUser();
-        const { data: { user: currentUser } } = await user;
-        if(!currentUser){ alert('Debes iniciar sesión primero'); return; }
+    function showPreview(url){ previewImg.src = url; previewBox.style.display = 'block'; }
+    function hidePreview(){ previewBox.style.display = 'none'; }
 
-        const name = document.getElementById('name').value.trim();
-        const type = document.getElementById('type').value;
-        const price = document.getElementById('price').value;
-        const expire_date = document.getElementById('expire_date').value || new Date().toISOString().split('T')[0];
-        const nick = document.getElementById('nick').value.trim();
-        const discord = document.getElementById('discord').value.trim();
-        const file = document.getElementById('file').files[0];
-        if(!file){ alert('Selecciona una imagen'); return; }
+    // Subir item
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim();
+      const type = document.getElementById('type').value;
+      const price = parseInt(document.getElementById('price').value,10);
+      const expire_date = document.getElementById('expire_date').value || new Date().toISOString();
+      const nick = document.getElementById('nick').value.trim();
+      const discord = document.getElementById('discord').value.trim();
+      const file = document.getElementById('file').files[0];
+      if(!file){ alert('Selecciona una imagen'); return; }
 
+      try{
         const filePath = `${Date.now()}_${file.name.replaceAll(' ','_')}`;
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl: '3600', upsert: false });
-        if(upErr){ alert('Error subiendo imagen: '+upErr.message); return; }
+        const { data: uploadData, error: upErr } = await supabaseClient.storage.from(BUCKET).upload(filePath, file, { cacheControl: '3600', upsert: false });
+        if(upErr){ console.error(upErr); alert('Error subiendo la imagen: ' + upErr.message); return; }
 
-        const { error: dbErr } = await supabase.from('items').insert([{
-          name, type, price: parseInt(price), expire_date, nick, discord, image_path: filePath, user_id: currentUser.id
+        const { error: dbErr } = await supabaseClient.from('items').insert([{
+          name, type, price, expire_date, nick, discord, image_path: filePath,
+          user_id: supabaseClient.auth.getUser().data?.user?.id
         }]);
-        if(dbErr){ alert('Error guardando en BD: '+dbErr.message); return; }
+        if(dbErr){ console.error(dbErr); alert('Error guardando en BD: ' + dbErr.message); return; }
 
         alert('Item publicado ✅');
         document.getElementById('uploadForm').reset();
         loadItems();
-      });
-
-      // ==== CARGAR ITEMS ====
-      async function loadItems(){
-        const qname = document.getElementById('qname').value.trim();
-        const qtype = document.getElementById('qtype').value;
-        const qorder = document.getElementById('qorder').value;
-
-        let query = supabase.from('items').select('*').eq('status','activo');
-        if(qname) query = query.ilike('name', `%${qname}%`);
-        if(qtype) query = query.eq('type', qtype);
-        query = query.order('price', { ascending: qorder==='asc' });
-
-        const { data, error } = await query;
-        if(error){ console.error(error); return; }
-
-        const tbody = document.querySelector('#itemsTable tbody');
-        tbody.innerHTML = '';
-        for(const item of data || []){
-          const imgUrl = supabase.storage.from(BUCKET).getPublicUrl(item.image_path)?.data?.publicUrl || '';
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="item-name" data-img="${imgUrl}" style="cursor:help;color:#7fd1ff">${item.name}</td>
-            <td>${item.type}</td>
-            <td>${item.price}</td>
-            <td>${item.nick}</td>
-            <td>${item.discord}</td>
-            <td>${currentUser?.id===item.user_id ? '<button data-id="'+item.id+'" class="soldBtn">Marcar vendido</button>':'-'}</td>
-          `;
-          tr.querySelector('.item-name').addEventListener('mouseenter',()=>showPreview(imgUrl));
-          tr.querySelector('.item-name').addEventListener('mouseleave',hidePreview);
-          const btn = tr.querySelector('.soldBtn');
-          if(btn){
-            btn.addEventListener('click', async (ev)=>{
-              await supabase.from('items').update({status:'vendido'}).eq('id', item.id);
-              loadItems();
-            });
-          }
-          tbody.appendChild(tr);
-        }
-      }
-
-      document.getElementById('btnSearch').addEventListener('click', loadItems);
-      loadItems();
-
-      // ==== Realtime ====
-      try{
-        supabase.channel('public:items')
-          .on('postgres_changes', { event:'*', schema:'public', table:'items' }, ()=>loadItems())
-          .subscribe();
-      }catch(e){ console.log('Realtime no disponible', e); }
-
+      } catch(err){ console.error(err); alert('Error inesperado'); }
     });
+
+    // Cargar items
+    async function loadItems(){
+      const qname = document.getElementById('qname').value.trim();
+      const qtype = document.getElementById('qtype').value;
+      const qorder = document.getElementById('qorder').value;
+
+      let query = supabaseClient.from('items').select('*').eq('status','activo');
+      if(qname) query = query.ilike('name', `%${qname}%`);
+      if(qtype) query = query.eq('type', qtype);
+      query = query.order('price', { ascending: qorder === 'asc' });
+
+      const { data, error } = await query;
+      if(error){ console.error(error); return; }
+      const tbody = document.querySelector('#itemsTable tbody');
+      tbody.innerHTML = '';
+      for(const item of data || []){
+        const pub = supabaseClient.storage.from(BUCKET).getPublicUrl(item.image_path || '');
+        const imgUrl = pub?.data?.publicUrl || '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="item-name" data-img="${imgUrl}" style="cursor:help;color:#7fd1ff">${item.name}</td>
+          <td>${item.type}</td>
+          <td>${item.price}</td>
+          <td>${item.nick}</td>
+          <td>${item.discord}</td>
+          <td><button data-id="${item.id}" class="soldBtn">Marcar vendido</button></td>
+        `;
+        tr.querySelector('.item-name').addEventListener('mouseenter', ev => { const u = ev.target.dataset.img; if(u) showPreview(u); });
+        tr.querySelector('.item-name').addEventListener('mouseleave', hidePreview);
+        tr.querySelector('.soldBtn').addEventListener('click', async ev => {
+          const id = ev.target.dataset.id;
+          await supabaseClient.from('items').update({status:'vendido'}).eq('id', id);
+          loadItems();
+        });
+        tbody.appendChild(tr);
+      }
+    }
+
+    document.getElementById('btnSearch').addEventListener('click', loadItems);
+    loadItems();
+  });
   </script>
 </body>
 </html>
+
+
