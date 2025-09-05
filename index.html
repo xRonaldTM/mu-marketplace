@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MU Marketplace - MVP</title>
+  <style>
+    body{font-family:Inter,system-ui,Arial;background:#0b0b0d;color:#e6e6e6;padding:18px;}
+    .card{background:#111;padding:12px;border-radius:8px;margin-bottom:12px}
+    input,select,button{padding:8px;margin-top:6px;width:100%;box-sizing:border-box;border-radius:6px;border:1px solid #333;background:#0e0e10;color:#fff}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border-bottom:1px solid #222;text-align:left}
+    .preview{position:fixed;right:18px;bottom:18px;background:#000;border-radius:8px;padding:6px;display:none;z-index:50}
+    img.preview-img{max-width:220px;max-height:220px;display:block}
+    .filters{display:flex;gap:8px}
+    .filters > *{flex:1}
+    .small{font-size:13px;color:#aaa}
+  </style>
+</head>
+<body>
+  <h1>MU Marketplace (MVP) 🚀</h1>
+
+  <div class="card">
+    <h3>Publicar ítem</h3>
+    <form id="uploadForm">
+      <input name="name" id="name" placeholder="Nombre del ítem (ej: Wings of Satan)" required />
+      <select name="type" id="type">
+        <option value="armas">Armas</option>
+        <option value="alas">Alas</option>
+        <option value="joyeria">Joyería</option>
+        <option value="joyas">Joyas</option>
+      </select>
+      <input type="number" name="price" id="price" placeholder="Precio (ej: 100)" required />
+      <input type="date" name="expire_date" id="expire_date" />
+      <input name="nick" id="nick" placeholder="Nick del juego (obligatorio)" required />
+      <input name="discord" id="discord" placeholder="Discord (ej: user#1234) (obligatorio)" required />
+      <input type="file" id="file" accept="image/*" required />
+      <button type="submit">Publicar ítem</button>
+      <p class="small">Nota: imagenes se suben al bucket 'items' en Supabase.</p>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Buscar / Filtrar</h3>
+    <div class="filters">
+      <input id="qname" placeholder="Buscar por nombre (palabra clave)" />
+      <select id="qtype">
+        <option value="">Todos los tipos</option>
+        <option value="armas">Armas</option>
+        <option value="alas">Alas</option>
+        <option value="joyeria">Joyería</option>
+        <option value="joyas">Joyas</option>
+      </select>
+      <select id="qorder">
+        <option value="asc">Precio: menor a mayor</option>
+        <option value="desc">Precio: mayor a menor</option>
+      </select>
+    </div>
+    <button id="btnSearch" style="margin-top:8px;">Aplicar filtros</button>
+  </div>
+
+  <div class="card">
+    <h3>Resultados</h3>
+    <table id="itemsTable">
+      <thead><tr><th>Ítem</th><th>Tipo</th><th>Precio</th><th>Nick</th><th>Discord</th><th>Acción</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="preview" id="previewBox">
+    <img class="preview-img" id="previewImg" src="" alt="preview" />
+  </div>
+
+  <!-- supabase-js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ====== REMPLAZA ESTO con tus datos de Supabase ======
+    const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';        // <- pega SUPABASE_URL aquí
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNjA3NzQsImV4cCI6MjA3MjYzNjc3NH0.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';                // <- pega SUPABASE_ANON_KEY aquí
+    const BUCKET = 'items'; // nombre del bucket que creaste (debe coincidir)
+    // =====================================================
+
+    const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // helper: mostrar preview flotante
+    const previewBox = document.getElementById('previewBox');
+    const previewImg = document.getElementById('previewImg');
+
+    function showPreview(url){
+      previewImg.src = url;
+      previewBox.style.display = 'block';
+    }
+    function hidePreview(){ previewBox.style.display = 'none'; }
+
+    // subir item con imagen
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim();
+      const type = document.getElementById('type').value;
+      const price = document.getElementById('price').value;
+      const expire_date = document.getElementById('expire_date').value || null;
+      const nick = document.getElementById('nick').value.trim();
+      const discord = document.getElementById('discord').value.trim();
+      const file = document.getElementById('file').files[0];
+      if(!file){ alert('Selecciona una imagen'); return; }
+
+      try{
+        // preparar nombre único
+        const filePath = `${Date.now()}_${file.name.replaceAll(' ','_')}`;
+
+        // 1) subir imagen al bucket
+        const { data: uploadData, error: upErr } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl: '3600', upsert: false });
+        if(upErr){ console.error(upErr); alert('Error subiendo la imagen: ' + upErr.message); return; }
+
+        // 2) guardar registro en la tabla (guardamos el path)
+        const { error: dbErr } = await supabase.from('items').insert([{
+          name, type, price: parseInt(price,10), expire_date: expire_date || null,
+          nick, discord, image_path: filePath
+        }]);
+        if(dbErr){ console.error(dbErr); alert('Error guardando en BD: ' + dbErr.message); return; }
+
+        alert('Item publicado ✅');
+        document.getElementById('uploadForm').reset();
+        loadItems(); // refrescar lista
+      }catch(err){ console.error(err); alert('Error inesperado'); }
+    });
+
+    // cargar items con filtros
+    async function loadItems(){
+      const qname = document.getElementById('qname').value.trim();
+      const qtype = document.getElementById('qtype').value;
+      const qorder = document.getElementById('qorder').value;
+
+      let query = supabase.from('items').select('*').eq('status','activo');
+      if(qname) query = query.ilike('name', `%${qname}%`);
+      if(qtype) query = query.eq('type', qtype);
+      query = query.order('price', { ascending: qorder === 'asc' });
+
+      const { data, error } = await query;
+      if(error){ console.error(error); return; }
+      const tbody = document.querySelector('#itemsTable tbody');
+      tbody.innerHTML = '';
+      for(const item of data || []){
+        // genera URL pública desde el path
+        const pub = supabase.storage.from(BUCKET).getPublicUrl(item.image_path || '');
+        const imgUrl = pub?.data?.publicUrl || '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="item-name" data-img="${imgUrl}" style="cursor:help;color:#7fd1ff">${item.name}</td>
+          <td>${item.type}</td>
+          <td>${item.price}</td>
+          <td>${item.nick}</td>
+          <td>${item.discord}</td>
+          <td><button data-id="${item.id}" class="soldBtn">Marcar vendido</button></td>
+        `;
+        // hover preview
+        tr.querySelector('.item-name').addEventListener('mouseenter', (ev) => {
+          const u = ev.target.dataset.img; if(u) showPreview(u);
+        });
+        tr.querySelector('.item-name').addEventListener('mouseleave', hidePreview);
+
+        // marcar vendido
+        tr.querySelector('.soldBtn').addEventListener('click', async (ev) => {
+          const id = ev.target.dataset.id;
+          await supabase.from('items').update({status:'vendido'}).eq('id', id);
+          loadItems();
+        });
+
+        tbody.appendChild(tr);
+      }
+    }
+
+    // boton buscar
+    document.getElementById('btnSearch').addEventListener('click', loadItems);
+
+    // carga inicial
+    loadItems();
+
+    // Realtime: escucha cambios en la tabla (si funciona en tu proyecto)
+    try{
+      const channel = supabase.channel('public:items')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, payload => {
+          loadItems();
+        })
+        .subscribe();
+    }catch(e){ console.log('Realtime no activo o no disponible', e); }
+
+  </script>
+</body>
+</html>
