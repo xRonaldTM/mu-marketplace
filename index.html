@@ -1,173 +1,163 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MU Marketplace - MVP</title>
-  <style>
-    body{font-family:Inter,system-ui,Arial;background:#0b0b0d;color:#e6e6e6;padding:18px;}
-    .card{background:#111;padding:12px;border-radius:8px;margin-bottom:12px}
-    input,select,button{padding:8px;margin-top:6px;width:100%;box-sizing:border-box;border-radius:6px;border:1px solid #333;background:#0e0e10;color:#fff}
-    table{width:100%;border-collapse:collapse;margin-top:12px}
-    th,td{padding:8px;border-bottom:1px solid #222;text-align:left}
-    .preview{position:fixed;right:18px;bottom:18px;background:#000;border-radius:8px;padding:6px;display:none;z-index:50}
-    img.preview-img{max-width:220px;max-height:220px;display:block}
-    .filters{display:flex;gap:8px}
-    .filters > *{flex:1}
-    .small{font-size:13px;color:#aaa}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MU Marketplace Profesional</title>
+<style>
+  body{font-family:Inter,system-ui,Arial;background:#0b0b0d;color:#e6e6e6;padding:18px;}
+  .card{background:#111;padding:18px;border-radius:10px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.5);}
+  input,select,button{padding:10px;margin-top:6px;width:100%;box-sizing:border-box;border-radius:6px;border:1px solid #333;background:#0e0e10;color:#fff;font-size:14px;}
+  button{cursor:pointer;background:#1f7fff;color:#fff;font-weight:600;border:none;}
+  table{width:100%;border-collapse:collapse;margin-top:16px;}
+  th,td{padding:10px;border-bottom:1px solid #222;text-align:left;}
+  th{background:#111;font-weight:600;}
+  img.thumb{width:50px;height:50px;object-fit:cover;border-radius:6px;}
+  .preview{position:fixed;right:18px;bottom:18px;background:#000;border-radius:10px;padding:6px;display:none;z-index:50;box-shadow:0 2px 10px rgba(0,0,0,0.7);}
+  img.preview-img{max-width:220px;max-height:220px;display:block;border-radius:6px;}
+</style>
 </head>
 <body>
-  <h1>MU Marketplace (MVP) 🚀</h1>
+<h1>MU Marketplace Profesional 🚀</h1>
 
-  <div class="card">
-    <h3>Publicar ítem</h3>
-    <form id="uploadForm">
-      <input name="name" id="name" placeholder="Nombre del ítem (ej: Wings of Satan)" required />
-      <select name="type" id="type">
-        <option value="armas">Armas</option>
-        <option value="alas">Alas</option>
-        <option value="joyeria">Joyería</option>
-        <option value="joyas">Joyas</option>
-      </select>
-      <input type="number" name="price" id="price" placeholder="Precio (ej: 100)" required />
-      <input type="date" name="expire_date" id="expire_date" />
-      <input name="nick" id="nick" placeholder="Nick del juego (obligatorio)" required />
-      <input name="discord" id="discord" placeholder="Discord (ej: user#1234) (obligatorio)" required />
-      <input type="file" id="file" accept="image/*" required />
-      <button type="submit">Publicar ítem</button>
-      <p class="small">Nota: imágenes se suben al bucket 'items' en Supabase.</p>
-    </form>
-  </div>
+<div class="card">
+  <h3>Publicar ítem</h3>
+  <form id="uploadForm">
+    <input name="name" id="name" placeholder="Nombre del ítem (ej: Wings of Satan)" required />
+    <select name="type" id="type" required>
+      <option value="">Selecciona tipo</option>
+      <option value="joyas">Joyas</option>
+      <option value="items">Items</option>
+      <option value="alas">Alas</option>
+      <option value="anillos">Anillos</option>
+      <option value="pendientes">Pendientes</option>
+    </select>
+    <input type="number" name="price" id="price" placeholder="Precio (ej: 100)" required min="0" />
+    <input name="nick" id="nick" placeholder="Nick del juego" required />
+    <input name="discord" id="discord" placeholder="Discord (ej: user#1234)" required />
+    <input type="file" id="file" accept="image/*" required />
+    <button type="submit">Publicar ítem</button>
+    <p style="font-size:12px;color:#aaa;margin-top:4px;">Imagen se sube al bucket 'items'. La fecha se asigna automáticamente.</p>
+  </form>
+</div>
 
-  <div class="card">
-    <h3>Buscar / Filtrar</h3>
-    <div class="filters">
-      <input id="qname" placeholder="Buscar por nombre (palabra clave)" />
-      <select id="qtype">
-        <option value="">Todos los tipos</option>
-        <option value="armas">Armas</option>
-        <option value="alas">Alas</option>
-        <option value="joyeria">Joyería</option>
-        <option value="joyas">Joyas</option>
-      </select>
-      <select id="qorder">
-        <option value="asc">Precio: menor a mayor</option>
-        <option value="desc">Precio: mayor a menor</option>
-      </select>
-    </div>
-    <button id="btnSearch" style="margin-top:8px;">Aplicar filtros</button>
-  </div>
+<div class="card">
+  <h3>Buscar / Filtrar</h3>
+  <input id="qname" placeholder="Buscar por nombre" />
+  <button id="btnSearch" style="margin-top:8px;">Aplicar filtros</button>
+</div>
 
-  <div class="card">
-    <h3>Resultados</h3>
-    <table id="itemsTable">
-      <thead><tr><th>Ítem</th><th>Tipo</th><th>Precio</th><th>Nick</th><th>Discord</th><th>Acción</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
+<div class="card">
+  <h3>Resultados</h3>
+  <table id="itemsTable">
+    <thead>
+      <tr>
+        <th>Imagen</th>
+        <th>Nombre</th>
+        <th>Tipo</th>
+        <th>Precio</th>
+        <th>Nick</th>
+        <th>Discord</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
 
-  <div class="preview" id="previewBox">
-    <img class="preview-img" id="previewImg" src="" alt="preview" />
-  </div>
+<div class="preview" id="previewBox">
+  <img class="preview-img" id="previewImg" src="" alt="preview" />
+</div>
 
-  <!-- supabase-js via CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // ====== REMPLAZA ESTO con tus datos de Supabase ======
-      const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNjA3NzQsImV4cCI6MjA3MjYzNjc3NH0.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';
-      const BUCKET = 'items';
-      // =====================================================
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-      const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNjA3NzQsImV4cCI6MjA3MjYzNjc3NH0.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';
+  const BUCKET = 'items';
 
-      const previewBox = document.getElementById('previewBox');
-      const previewImg = document.getElementById('previewImg');
-      function showPreview(url){ previewImg.src = url; previewBox.style.display='block'; }
-      function hidePreview(){ previewBox.style.display='none'; }
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      // subir item
-      async function uploadItem(e){
-        e.preventDefault();
-        const name = document.getElementById('name').value.trim();
-        const type = document.getElementById('type').value;
-        const price = document.getElementById('price').value;
-        const expire_date = document.getElementById('expire_date').value || null;
-        const nick = document.getElementById('nick').value.trim();
-        const discord = document.getElementById('discord').value.trim();
-        const file = document.getElementById('file').files[0];
-        if(!file){ alert('Selecciona una imagen'); return; }
+  const previewBox = document.getElementById('previewBox');
+  const previewImg = document.getElementById('previewImg');
 
-        try{
-          const filePath = `${Date.now()}_${file.name.replaceAll(' ','_')}`;
-          const { data: uploadData, error: upErr } = await supabase.storage.from(BUCKET)
-            .upload(filePath, file, { cacheControl:'3600', upsert:false });
-          if(upErr){ console.error(upErr); alert('Error subiendo la imagen: '+upErr.message); return; }
+  function showPreview(url){ previewImg.src = url; previewBox.style.display='block'; }
+  function hidePreview(){ previewBox.style.display='none'; }
 
-          const { error: dbErr } = await supabase.from('items').insert([{
-            name, type, price:parseInt(price,10), expire_date:expire_date || null,
-            nick, discord, image_path:filePath
-          }]);
-          if(dbErr){ console.error(dbErr); alert('Error guardando en BD: '+dbErr.message); return; }
+  async function uploadItem(e){
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const type = document.getElementById('type').value;
+    const price = parseInt(document.getElementById('price').value,10);
+    const nick = document.getElementById('nick').value.trim();
+    const discord = document.getElementById('discord').value.trim();
+    const file = document.getElementById('file').files[0];
 
-          alert('Item publicado ✅');
-          document.getElementById('uploadForm').reset();
-          loadItems();
-        }catch(err){ console.error(err); alert('Error inesperado'); }
-      }
+    if(!file){ alert('Selecciona una imagen'); return; }
+    if(!type){ alert('Selecciona un tipo'); return; }
 
-      // cargar items
-      async function loadItems(){
-        const qname = document.getElementById('qname').value.trim();
-        const qtype = document.getElementById('qtype').value;
-        const qorder = document.getElementById('qorder').value;
+    try{
+      const filePath = `${Date.now()}_${file.name.replaceAll(' ','_')}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl:'3600', upsert:false });
+      if(upErr){ console.error(upErr); alert('Error subiendo imagen: '+upErr.message); return; }
 
-        let query = supabase.from('items').select('*').eq('status','activo');
-        if(qname) query = query.ilike('name', `%${qname}%`);
-        if(qtype) query = query.eq('type', qtype);
-        query = query.order('price',{ascending:qorder==='asc'});
+      await supabase.from('items').insert([{
+        name, type, price, expire_date: new Date().toISOString(),
+        nick, discord, image_path:filePath, status:'activo'
+      }]);
 
-        const { data, error } = await query;
-        if(error){ console.error(error); return; }
-
-        const tbody = document.querySelector('#itemsTable tbody');
-        tbody.innerHTML='';
-        for(const item of data || []){
-          const pub = supabase.storage.from(BUCKET).getPublicUrl(item.image_path || '');
-          const imgUrl = pub?.data?.publicUrl || '';
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="item-name" data-img="${imgUrl}" style="cursor:help;color:#7fd1ff">${item.name}</td>
-            <td>${item.type}</td>
-            <td>${item.price}</td>
-            <td>${item.nick}</td>
-            <td>${item.discord}</td>
-            <td><button data-id="${item.id}" class="soldBtn">Marcar vendido</button></td>
-          `;
-          tr.querySelector('.item-name').addEventListener('mouseenter', ev => { const u=ev.target.dataset.img; if(u) showPreview(u); });
-          tr.querySelector('.item-name').addEventListener('mouseleave', hidePreview);
-          tr.querySelector('.soldBtn').addEventListener('click', async ev => { const id=ev.target.dataset.id; await supabase.from('items').update({status:'vendido'}).eq('id',id); loadItems(); });
-          tbody.appendChild(tr);
-        }
-      }
-
-      // eventos
-      document.getElementById('uploadForm').addEventListener('submit', uploadItem);
-      document.getElementById('btnSearch').addEventListener('click', loadItems);
-
-      // carga inicial
+      document.getElementById('uploadForm').reset();
       loadItems();
+    }catch(err){ console.error(err); alert('Error inesperado'); }
+  }
 
-      // ✅ Realtime seguro (sin usar supabase.channel() que rompe CSP)
-      supabase.from('items')
-        .on('INSERT', payload => loadItems())
-        .on('UPDATE', payload => loadItems())
-        .subscribe();
-    });
-  </script>
+  async function loadItems(){
+    const qname = document.getElementById('qname').value.trim();
+    let query = supabase.from('items').select('*').eq('status','activo');
+    if(qname) query = query.ilike('name', `%${qname}%`);
+
+    const { data, error } = await query;
+    if(error){ console.error(error); return; }
+
+    const tbody = document.querySelector('#itemsTable tbody');
+    tbody.innerHTML = '';
+    for(const item of data || []){
+      const pub = supabase.storage.from(BUCKET).getPublicUrl(item.image_path || '');
+      const imgUrl = pub?.data?.publicUrl || '';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><img class="thumb" src="${imgUrl}" /></td>
+        <td class="item-name">${item.name}</td>
+        <td>${item.type}</td>
+        <td>${item.price}</td>
+        <td>${item.nick}</td>
+        <td>${item.discord}</td>
+        <td><button data-id="${item.id}" class="soldBtn">Marcar vendido</button></td>
+      `;
+      tr.querySelector('.item-name').addEventListener('mouseenter', ()=>showPreview(imgUrl));
+      tr.querySelector('.item-name').addEventListener('mouseleave', hidePreview);
+      tr.querySelector('.soldBtn').addEventListener('click', async ev=>{
+        const id=ev.target.dataset.id;
+        await supabase.from('items').update({status:'vendido'}).eq('id',id);
+        loadItems();
+      });
+      tbody.appendChild(tr);
+    }
+  }
+
+  document.getElementById('uploadForm').addEventListener('submit', uploadItem);
+  document.getElementById('btnSearch').addEventListener('click', loadItems);
+
+  loadItems();
+
+  // Suscripción en tiempo real
+  supabase.from('items')
+    .on('INSERT', payload => loadItems())
+    .on('UPDATE', payload => loadItems())
+    .subscribe();
+</script>
 </body>
 </html>
+
 
