@@ -18,15 +18,15 @@
   </style>
 </head>
 <body>
-  <h1>MU Marketplace (Multiusuario) 🚀</h1>
+  <h1>MU Marketplace Multiusuario 🚀</h1>
 
-  <div class="card">
+  <div class="card" id="authCard">
+    <h3>Iniciar sesión</h3>
     <button id="loginBtn">Iniciar sesión con Google</button>
-    <button id="logoutBtn" style="display:none">Cerrar sesión</button>
-    <p class="small">Solo los usuarios logueados pueden publicar o modificar sus items.</p>
+    <p class="small">Necesario para publicar y administrar tus items.</p>
   </div>
 
-  <div class="card" id="publishCard" style="display:none">
+  <div class="card" id="uploadCard" style="display:none">
     <h3>Publicar ítem</h3>
     <form id="uploadForm">
       <input name="name" id="name" placeholder="Nombre del ítem (ej: Wings of Satan)" required />
@@ -76,56 +76,48 @@
     <img class="preview-img" id="previewImg" src="" alt="preview" />
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- supabase-js v2 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
   <script>
-    // ====== TUS DATOS DE SUPABASE ======
+    // ====== CONFIGURA TU SUPABASE ======
     const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNjA3NzQsImV4cCI6MjA3MjYzNjc3NH0.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';
     const BUCKET = 'items';
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    let currentUser = null;
+    const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    const authCard = document.getElementById('authCard');
+    const uploadCard = document.getElementById('uploadCard');
+    const loginBtn = document.getElementById('loginBtn');
     const previewBox = document.getElementById('previewBox');
     const previewImg = document.getElementById('previewImg');
 
-    function showPreview(url){
-      previewImg.src = url;
-      previewBox.style.display = 'block';
-    }
-    function hidePreview(){ previewBox.style.display = 'none'; }
+    function showPreview(url){ previewImg.src = url; previewBox.style.display='block'; }
+    function hidePreview(){ previewBox.style.display='none'; }
 
-    // ====== LOGIN ======
-    const loginBtn = document.getElementById('loginBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const publishCard = document.getElementById('publishCard');
+    let currentUser = null;
 
+    // Iniciar sesión con Google
     loginBtn.addEventListener('click', async () => {
       const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-      if(error) console.log('Error login:', error.message);
+      if(error) alert('Error iniciando sesión: '+error.message);
     });
 
-    logoutBtn.addEventListener('click', async () => {
-      await supabase.auth.signOut();
-      alert('Sesión cerrada');
-      publishCard.style.display = 'none';
-    });
-
+    // Escuchar cambios de sesión
     supabase.auth.onAuthStateChange((event, session) => {
       if(session?.user){
         currentUser = session.user;
-        loginBtn.style.display = 'none';
-        logoutBtn.style.display = 'block';
-        publishCard.style.display = 'block';
+        authCard.style.display = 'none';
+        uploadCard.style.display = 'block';
+        loadItems();
       } else {
         currentUser = null;
-        loginBtn.style.display = 'block';
-        logoutBtn.style.display = 'none';
-        publishCard.style.display = 'none';
+        authCard.style.display = 'block';
+        uploadCard.style.display = 'none';
       }
     });
 
-    // ====== PUBLICAR ITEM ======
-    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    // Subir item
+    document.getElementById('uploadForm').addEventListener('submit', async e=>{
       e.preventDefault();
       if(!currentUser){ alert('Debes iniciar sesión'); return; }
 
@@ -135,34 +127,32 @@
       const file = document.getElementById('file').files[0];
       if(!file){ alert('Selecciona una imagen'); return; }
 
-      const filePath = `${Date.now()}_${file.name.replaceAll(' ','_')}`;
-
-      try {
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl:'3600', upsert:false });
+      try{
+        const filePath = `${Date.now()}_${file.name.replaceAll(' ','_')}`;
+        const { data: uploadData, error: upErr } = await supabase.storage.from(BUCKET).upload(filePath,file,{cacheControl:'3600',upsert:false});
         if(upErr){ console.error(upErr); alert('Error subiendo imagen: '+upErr.message); return; }
 
         const { error: dbErr } = await supabase.from('items').insert([{
-          name, type, price, image_path: filePath, status:'activo',
-          user_id: currentUser.id, created_at: new Date().toISOString()
+          name, type, price, image_path: filePath, user_id: currentUser.id
         }]);
-        if(dbErr){ console.error(dbErr); alert('Error guardando en BD: '+dbErr.message); return; }
+        if(dbErr){ console.error(dbErr); alert('Error guardando item: '+dbErr.message); return; }
 
         alert('Item publicado ✅');
-        document.getElementById('uploadForm').reset();
+        e.target.reset();
         loadItems();
       } catch(err){ console.error(err); alert('Error inesperado'); }
     });
 
-    // ====== CARGAR ITEMS ======
+    // Cargar items
     async function loadItems(){
       const qname = document.getElementById('qname').value.trim();
       const qtype = document.getElementById('qtype').value;
       const qorder = document.getElementById('qorder').value;
 
-      let query = supabase.from('items').select('*').eq('status','activo');
+      let query = supabase.from('items').select('*');
       if(qname) query = query.ilike('name', `%${qname}%`);
       if(qtype) query = query.eq('type', qtype);
-      query = query.order('created_at', { ascending: false });
+      query = query.order('price',{ascending: qorder==='asc'});
 
       const { data, error } = await query;
       if(error){ console.error(error); return; }
@@ -179,19 +169,17 @@
           <td class="item-name" data-img="${imgUrl}" style="cursor:help;color:#7fd1ff">${item.name}</td>
           <td>${item.type}</td>
           <td>${item.price}</td>
-          <td>${item.user_id}</td>
-          <td>
-            ${currentUser?.id === item.user_id ? `<button data-id="${item.id}" class="soldBtn">Marcar vendido</button>` : ''}
-          </td>
+          <td>${item.user_id === currentUser?.id ? 'Tú' : item.user_id}</td>
+          <td>${item.user_id === currentUser?.id ? '<button class="soldBtn" data-id="'+item.id+'">Marcar vendido</button>' : ''}</td>
         `;
 
-        tr.querySelector('.item-name').addEventListener('mouseenter', e => showPreview(e.target.dataset.img));
-        tr.querySelector('.item-name').addEventListener('mouseleave', hidePreview);
+        tr.querySelector('.item-name').addEventListener('mouseenter',ev=>{const u=ev.target.dataset.img;if(u) showPreview(u);});
+        tr.querySelector('.item-name').addEventListener('mouseleave',hidePreview);
 
         const soldBtn = tr.querySelector('.soldBtn');
         if(soldBtn){
-          soldBtn.addEventListener('click', async (ev)=>{
-            await supabase.from('items').update({status:'vendido'}).eq('id', item.id);
+          soldBtn.addEventListener('click', async ev=>{
+            await supabase.from('items').update({status:'vendido'}).eq('id', ev.target.dataset.id);
             loadItems();
           });
         }
@@ -202,21 +190,10 @@
 
     document.getElementById('btnSearch').addEventListener('click', loadItems);
 
-    // Carga inicial
     loadItems();
-
-    // Realtime
-    try{
-      supabase.channel('public:items')
-        .on('postgres_changes', { event:'*', schema:'public', table:'items' }, payload=> loadItems() )
-        .subscribe();
-    } catch(e){ console.log('Realtime no activo o no disponible', e); }
   </script>
 </body>
 </html>
-
-
-
 
 
 
