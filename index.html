@@ -78,19 +78,17 @@
       // ====== REMPLAZA ESTO con tus datos de Supabase ======
       const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNjA3NzQsImV4cCI6MjA3MjYzNjc3NH0.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';
-      const BUCKET = 'items'; // nombre del bucket
+      const BUCKET = 'items';
       // =====================================================
 
-      // inicializar Supabase
       const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      // helper: mostrar preview flotante
       const previewBox = document.getElementById('previewBox');
       const previewImg = document.getElementById('previewImg');
       function showPreview(url){ previewImg.src = url; previewBox.style.display='block'; }
       function hidePreview(){ previewBox.style.display='none'; }
 
-      // subir item con imagen
+      // subir item
       async function uploadItem(e){
         e.preventDefault();
         const name = document.getElementById('name').value.trim();
@@ -163,4 +161,13 @@
       // carga inicial
       loadItems();
 
-      // realtime
+      // ✅ Realtime seguro (sin usar supabase.channel() que rompe CSP)
+      supabase.from('items')
+        .on('INSERT', payload => loadItems())
+        .on('UPDATE', payload => loadItems())
+        .subscribe();
+    });
+  </script>
+</body>
+</html>
+
