@@ -20,19 +20,22 @@
 <body>
   <h1>MU Marketplace (MVP) 🚀</h1>
 
-  <!-- Login / Logout -->
-  <div class="card">
-    <button id="loginBtn">Iniciar sesión</button>
-    <button id="logoutBtn" style="display:none">Cerrar sesión</button>
-    <p id="userInfo" class="small"></p>
+  <!-- LOGIN -->
+  <div class="card" id="loginCard">
+    <h3>Iniciar Sesión</h3>
+    <input type="email" id="email" placeholder="Correo electrónico" />
+    <input type="password" id="password" placeholder="Contraseña" />
+    <button id="btnLogin">Iniciar sesión</button>
+    <button id="btnSignUp">Registrarse</button>
+    <p class="small">Cada usuario maneja sus propios ítems.</p>
   </div>
 
-  <!-- Publicar ítem -->
-  <div class="card" id="itemFormCard" style="display:none">
+  <!-- PUBLICAR ITEM -->
+  <div class="card" id="uploadCard" style="display:none;">
     <h3>Publicar ítem</h3>
     <form id="uploadForm">
       <input name="name" id="name" placeholder="Nombre del ítem" required />
-      <select name="type" id="type" required>
+      <select name="type" id="type">
         <option value="joyas">Joyas</option>
         <option value="items">Items</option>
         <option value="alas">Alas</option>
@@ -42,36 +45,15 @@
       <input type="number" name="price" id="price" placeholder="Precio" required />
       <input type="file" id="file" accept="image/*" required />
       <button type="submit">Publicar ítem</button>
-      <p class="small">Las imágenes se suben al bucket 'items' en Supabase.</p>
     </form>
+    <button id="btnLogout">Cerrar sesión</button>
   </div>
 
-  <!-- Filtros -->
+  <!-- LISTA DE ITEMS -->
   <div class="card">
-    <h3>Buscar / Filtrar</h3>
-    <div class="filters">
-      <input id="qname" placeholder="Buscar por nombre" />
-      <select id="qtype">
-        <option value="">Todos los tipos</option>
-        <option value="joyas">Joyas</option>
-        <option value="items">Items</option>
-        <option value="alas">Alas</option>
-        <option value="anillos">Anillos</option>
-        <option value="pendientes">Pendientes</option>
-      </select>
-      <select id="qorder">
-        <option value="asc">Precio: menor a mayor</option>
-        <option value="desc">Precio: mayor a menor</option>
-      </select>
-    </div>
-    <button id="btnSearch" style="margin-top:8px;">Aplicar filtros</button>
-  </div>
-
-  <!-- Resultados -->
-  <div class="card">
-    <h3>Resultados</h3>
+    <h3>Items Activos</h3>
     <table id="itemsTable">
-      <thead><tr><th>Ítem</th><th>Tipo</th><th>Precio</th><th>Dueño</th><th>Acción</th></tr></thead>
+      <thead><tr><th>Ítem</th><th>Tipo</th><th>Precio</th><th>Usuario</th><th>Acción</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -80,136 +62,104 @@
     <img class="preview-img" id="previewImg" src="" alt="preview" />
   </div>
 
-  <!-- supabase-js v2 -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- supabase-js -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
   <script>
-    // ===== Configura tu proyecto =====
+    // === CONFIGURACIÓN SUPABASE ===
     const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNjA3NzQsImV4cCI6MjA3MjYzNjc3NH0.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';
     const BUCKET = 'items';
-
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Helpers
+    const loginCard = document.getElementById('loginCard');
+    const uploadCard = document.getElementById('uploadCard');
     const previewBox = document.getElementById('previewBox');
     const previewImg = document.getElementById('previewImg');
-    const showPreview = (url) => { previewImg.src = url; previewBox.style.display = 'block'; };
-    const hidePreview = () => { previewBox.style.display = 'none'; };
 
-    let currentUser = null;
+    function showPreview(url){ previewImg.src = url; previewBox.style.display = 'block'; }
+    function hidePreview(){ previewBox.style.display = 'none'; }
 
-    // Login / Logout
-    const loginBtn = document.getElementById('loginBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const userInfo = document.getElementById('userInfo');
-    const itemFormCard = document.getElementById('itemFormCard');
-
-    loginBtn.addEventListener('click', async () => {
-      const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'github' });
-      if(error) return alert('Error login: ' + error.message);
+    // === LOGIN & REGISTRO ===
+    document.getElementById('btnSignUp').addEventListener('click', async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if(error) alert(error.message);
+      else alert('Usuario registrado. Revisa tu correo.');
     });
 
-    logoutBtn.addEventListener('click', async () => {
-      await supabase.auth.signOut();
-      currentUser = null;
-      userInfo.textContent = '';
-      itemFormCard.style.display = 'none';
-      loginBtn.style.display = 'inline-block';
-      logoutBtn.style.display = 'none';
-    });
-
-    supabase.auth.onAuthStateChange((_event, session) => {
-      currentUser = session?.user ?? null;
-      if(currentUser){
-        loginBtn.style.display = 'none';
-        logoutBtn.style.display = 'inline-block';
-        itemFormCard.style.display = 'block';
-        userInfo.textContent = `Conectado como: ${currentUser.email || currentUser.user_metadata.full_name || currentUser.id}`;
-      } else {
-        loginBtn.style.display = 'inline-block';
-        logoutBtn.style.display = 'none';
-        itemFormCard.style.display = 'none';
-        userInfo.textContent = '';
+    document.getElementById('btnLogin').addEventListener('click', async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if(error) alert(error.message);
+      else {
+        loginCard.style.display = 'none';
+        uploadCard.style.display = 'block';
+        loadItems();
       }
-      loadItems();
     });
 
-    // Subir item
-    document.getElementById('uploadForm').addEventListener('submit', async e => {
-      e.preventDefault();
-      if(!currentUser) return alert('Debes iniciar sesión');
+    document.getElementById('btnLogout').addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      uploadCard.style.display = 'none';
+      loginCard.style.display = 'block';
+    });
 
+    // === PUBLICAR ITEM ===
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const user = supabase.auth.getUser();
       const name = document.getElementById('name').value.trim();
       const type = document.getElementById('type').value;
-      const price = parseInt(document.getElementById('price').value,10);
+      const price = parseInt(document.getElementById('price').value);
       const file = document.getElementById('file').files[0];
       if(!file) return alert('Selecciona una imagen');
 
-      try{
-        const filePath = `${Date.now()}_${file.name.replaceAll(' ','_')}`;
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl: '3600', upsert:false });
-        if(upErr) return alert('Error subiendo imagen: ' + upErr.message);
+      const filePath = `${Date.now()}_${file.name.replaceAll(' ','_')}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl: '3600', upsert: false });
+      if(upErr) return alert(upErr.message);
 
-        const { error: dbErr } = await supabase.from('items').insert([{
-          name, type, price, image_path: filePath, user_id: currentUser.id, status:'activo'
-        }]);
-        if(dbErr) return alert('Error guardando item: ' + dbErr.message);
+      const { error: dbErr } = await supabase.from('items').insert([{
+        name, type, price, image_path: filePath, user_id: supabase.auth.getUser().data.user.id
+      }]);
+      if(dbErr) return alert(dbErr.message);
 
-        alert('Item publicado ✅');
-        e.target.reset();
-        loadItems();
-      }catch(err){ console.error(err); alert('Error inesperado'); }
+      alert('Item publicado ✅');
+      document.getElementById('uploadForm').reset();
+      loadItems();
     });
 
-    // Cargar items
+    // === CARGAR ITEMS ===
     async function loadItems(){
-      let query = supabase.from('items').select('*').eq('status','activo');
-      const qname = document.getElementById('qname').value.trim();
-      const qtype = document.getElementById('qtype').value;
-      const qorder = document.getElementById('qorder').value;
-
-      if(qname) query = query.ilike('name', `%${qname}%`);
-      if(qtype) query = query.eq('type', qtype);
-      query = query.order('price', { ascending: qorder==='asc' });
-
-      const { data, error } = await query;
+      const { data, error } = await supabase.from('items').select('*').eq('status','activo').order('created_at',{ascending:false});
       if(error) return console.error(error);
 
       const tbody = document.querySelector('#itemsTable tbody');
       tbody.innerHTML = '';
-      for(const item of data || []){
-        const pub = supabase.storage.from(BUCKET).getPublicUrl(item.image_path || '');
-        const imgUrl = pub?.data?.publicUrl || '';
+      const userId = supabase.auth.getUser().data?.user?.id;
 
+      for(const item of data || []){
+        const pubUrl = supabase.storage.from(BUCKET).getPublicUrl(item.image_path).data.publicUrl || '';
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="item-name" data-img="${imgUrl}" style="cursor:help;color:#7fd1ff">${item.name}</td>
+          <td class="item-name" data-img="${pubUrl}" style="cursor:help;color:#7fd1ff">${item.name}</td>
           <td>${item.type}</td>
           <td>${item.price}</td>
-          <td>${item.user_id === currentUser?.id ? 'Tú' : 'Otro'}</td>
-          <td>${item.user_id === currentUser?.id ? '<button class="soldBtn">Marcar vendido</button>' : ''}</td>
+          <td>${item.user_id}</td>
+          <td>${item.user_id===userId?`<button data-id="${item.id}" class="soldBtn">Vendido</button>`:''}</td>
         `;
-        // hover preview
-        tr.querySelector('.item-name').addEventListener('mouseenter', e => showPreview(e.target.dataset.img));
+        tr.querySelector('.item-name').addEventListener('mouseenter', ()=>showPreview(pubUrl));
         tr.querySelector('.item-name').addEventListener('mouseleave', hidePreview);
-
-        // marcar vendido
-        const btn = tr.querySelector('.soldBtn');
-        if(btn) btn.addEventListener('click', async () => {
-          await supabase.from('items').update({status:'vendido'}).eq('id', item.id);
-          loadItems();
-        });
-
+        if(item.user_id===userId){
+          tr.querySelector('.soldBtn').addEventListener('click', async ()=>{
+            await supabase.from('items').update({status:'vendido'}).eq('id', item.id);
+            loadItems();
+          });
+        }
         tbody.appendChild(tr);
       }
     }
-
-    // Botón buscar
-    document.getElementById('btnSearch').addEventListener('click', loadItems);
-
-    // Carga inicial
-    loadItems();
-
   </script>
 </body>
 </html>
