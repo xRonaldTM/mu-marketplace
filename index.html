@@ -83,7 +83,7 @@
     const SUPABASE_URL = 'https://wsjxfcxfqhguscmzlpgr.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzanhmY3hmcWhndXNjbXpscGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNjA3NzQsImV4cCI6MjA3MjYzNjc3NH0.gUivKjymj_MDZuSLpSEeO3nGDGZDXDcEjtsDQ-PKNe4';
     const BUCKET = 'items';
-    const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const authCard = document.getElementById('authCard');
     const uploadCard = document.getElementById('uploadCard');
@@ -194,6 +194,7 @@
   </script>
 </body>
 </html>
+
 
 
 
